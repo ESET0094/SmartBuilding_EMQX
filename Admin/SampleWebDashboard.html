@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket MQTT Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    #status { margin-bottom: 10px; padding: 5px; background-color: #ddd; }
+    .connected { background-color: #e0ffe0; color: green; }
+    .disconnected { background-color: #ffe0e0; color: red; }
+    #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-top: 10px; }
+    .message-item { padding: 5px 0; border-bottom: 1px solid #eee; }
+    pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h2>MQTT WebSocket Dashboard</h2>
+  <div id="status" class="disconnected">Status: Disconnected</div>
+  <p>Receiving JSON messages on topic: <strong>topic/Sensors/Data</strong></p>
+  
+  <h3>Received Messages:</h3>
+  <div id="messages">
+    <!-- Messages will appear here -->
+  </div>
+
+<script>
+    // Configuration matching your Docker setup
+    const BROKER_HOST = 'localhost';
+    const WS_PORT = 8081;
+    const WS_PATH = '/mqtt';
+    const USERNAME = 'Admin';
+    const PASSWORD = 'Public';
+    const SUBSCRIBE_TOPIC = 'topic/Sensors/Data'; // The topic you publish to
+
+    const clientId = 'mqttjs_' + Math.random().toString(16).substring(2, 10);
+    const host = `ws://${BROKER_HOST}:${WS_PORT}${WS_PATH}`; // Construct the full URL
+
+    const options = {
+      keepalive: 60,
+      clientId: clientId,
+      username: USERNAME, // Add username
+      password: PASSWORD, // Add password
+      protocolId: 'MQTT',
+      protocolVersion: 5,
+      clean: true,
+      reconnectPeriod: 1000,
+      connectTimeout: 30 * 1000,
+    };
+
+    console.log(`Connecting to broker: ${host}`);
+    const client = mqtt.connect(host, options);
+
+    const statusDiv = document.getElementById('status');
+    const messagesDiv = document.getElementById('messages');
+
+    client.on('connect', () => {
+      console.log('Connected');
+      statusDiv.textContent = 'Status: Connected';
+      statusDiv.className = 'connected';
+
+      // Subscribe to the topic upon successful connection
+      client.subscribe(SUBSCRIBE_TOPIC, (err, granted) => {
+        if (err) {
+          console.log('Subscription error:', err);
+        } else {
+          console.log(`Subscribed to ${granted[0].topic} with QoS ${granted[0].qos}`);
+        }
+      });
+    });
+
+    client.on('message', (topic, message) => {
+      // Message is a Buffer, convert to string
+      const messageString = message.toString();
+      console.log(`Received message on topic "${topic}": ${messageString}`);
+
+      // Try to parse as JSON
+      let payloadDisplay = messageString;
+      try {
+        const jsonPayload = JSON.parse(messageString);
+        // Format the JSON nicely for display
+        payloadDisplay = JSON.stringify(jsonPayload, null, 2); 
+      } catch (e) {
+        // If not JSON, display as plain text
+        console.log("Message was not in JSON format.");
+      }
+
+      // Display in the dashboard
+      const messageItem = document.createElement('div');
+      messageItem.className = 'message-item';
+      messageItem.innerHTML = `<strong>[${new Date().toLocaleTimeString()}] Topic: ${topic}</strong> <pre>${payloadDisplay}</pre>`;
+      
+      messagesDiv.appendChild(messageItem);
+      // Auto-scroll to the latest message
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    client.on('error', (err) => {
+      console.log('Connection error: ', err);
+      statusDiv.textContent = `Status: Error - ${err.message}`;
+      statusDiv.className = 'disconnected';
+      client.end();
+    });
+
+    client.on('reconnect', () => {
+      console.log('Reconnecting...');
+      statusDiv.textContent = 'Status: Reconnecting...';
+      statusDiv.className = 'disconnected';
+    });
+
+    client.on('close', () => {
+        console.log('Disconnected');
+        statusDiv.textContent = 'Status: Disconnected';
+        statusDiv.className = 'disconnected';
+    });
+
+</script>
+</body>
+</html>
