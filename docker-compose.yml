@@ -1,0 +1,32 @@
+services:
+  emqx:
+    # Using EMQX 5.4.1
+    image: emqx/emqx:5.4.1
+    container_name: emqx
+    hostname: localhost
+    environment:
+      # Set to 'false' to require authentication (recommended with ACLs)
+      - EMQX_ALLOW_ANONYMOUS=false 
+      - EMQX_NODE__NAME=emqx@emqx
+      - EMQX_NODE__COOKIE=secretcookie
+      - EMQX_CLUSTER__DISCOVERY_STRATEGY=static
+      - EMQX_CLUSTER__CORE_NODES=emqx@emqx
+
+
+
+      # # Enable Authorization Cache and specify the ACL file path
+      - EMQX_AUTHORIZATION__CACHE__ENABLE=true
+      - EMQX_AUTHORIZATION__ACL__FILE=/opt/emqx/etc/acl.conf
+
+      # Enable user authentication via environment variables (for the 'Admin' user)
+      - EMQX_AUTH__USER__1__USERNAME=Admin
+      - EMQX_AUTH__USER__1__PASSWORD=Public
+
+    ports:
+      - "18083:18083" # Dashboard Web Interface
+      - "8083:8083"   # MQTT over WebSockets
+      - "1883:1883"   # MQTT over TCP
+      - "8883:8883"   # MQTT over Secure WebSockets
+
+    volumes:
+          - ./acl.conf:/opt/emqx/etc/acl.conf # Mount your ACL file

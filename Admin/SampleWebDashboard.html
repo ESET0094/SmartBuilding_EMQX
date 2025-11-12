@@ -18,7 +18,7 @@
 <body>
   <h2>MQTT WebSocket Dashboard</h2>
   <div id="status" class="disconnected">Status: Disconnected</div>
-  <p>Receiving JSON messages on topic: <strong>topic/Sensors/Data</strong></p>
+  <p>Receiving JSON messages on topic: <strong>topic/Smartmeter/Commands</strong></p>
   
   <h3>Received Messages:</h3>
   <div id="messages">
@@ -28,11 +28,11 @@
 <script>
     // Configuration matching your Docker setup
     const BROKER_HOST = 'localhost';
-    const WS_PORT = 8081;
+    const WS_PORT = 8083;
     const WS_PATH = '/mqtt';
     const USERNAME = 'Admin';
     const PASSWORD = 'Public';
-    const SUBSCRIBE_TOPIC = 'topic/Sensors/Data'; // The topic you publish to
+    const SUBSCRIBE_TOPIC = 'topic/Smartmeter/Commands'; // The topic you publish to
 
     const clientId = 'mqttjs_' + Math.random().toString(16).substring(2, 10);
     const host = `ws://${BROKER_HOST}:${WS_PORT}${WS_PATH}`; // Construct the full URL
@@ -40,14 +40,16 @@
     const options = {
       keepalive: 60,
       clientId: clientId,
-      username: USERNAME, // Add username
-      password: PASSWORD, // Add password
+      // REMOVE or comment out these lines:
+      username: USERNAME, 
+      password: PASSWORD, 
       protocolId: 'MQTT',
       protocolVersion: 5,
       clean: true,
       reconnectPeriod: 1000,
       connectTimeout: 30 * 1000,
     };
+
 
     console.log(`Connecting to broker: ${host}`);
     const client = mqtt.connect(host, options);

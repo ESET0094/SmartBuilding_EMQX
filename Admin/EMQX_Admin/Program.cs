@@ -1,5 +1,5 @@
 ﻿using MQTTnet;
-using MQTTnet;
+
 using MQTTnet.Client;
 using MQTTnet.Extensions.ManagedClient;
 using System;
@@ -11,17 +11,19 @@ namespace EMQX_Admin
     {
         public class TelemetryData
         {
-            public string AdminName { get; set; }
+            public string Username { get; set; }
             public string Status { get; set; }
             public DateTime TimeStamp { get; set; }
+
+            public string Command { get; set; }
         }
-        public async Task EMQX_Admin()
+        static async Task Main()
         {
             IManagedMqttClient _mqttClient;
             var factory = new MqttFactory();
             _mqttClient = factory.CreateManagedMqttClient();
             var BROKER_HOST = "localhost";  // to be replaced with Dashboard IP or Docker Internal IP
-            var WS_PORT = 8081;
+            var WS_PORT = 8083;
             var WS_PATH = "/mqtt";
             var USERNAME = "Admin";
             var PASSWORD = "Public";
@@ -47,24 +49,30 @@ namespace EMQX_Admin
             Console.WriteLine("EMQX Admin Connected to EMQX via WebSocket...");
 
             await _mqttClient.SubscribeAsync("topic/#");
-
-            var messageData = new TelemetryData
+            while (true)
             {
-                AdminName = "Admin",
-                Status = "Active",
-                TimeStamp = DateTime.Now,
-            };
-            var jsonPayload = JsonSerializer.Serialize(messageData);
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic("topic/Sensors/Data")
-                .WithPayload(jsonPayload)   
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
-                .Build();
+                Console.WriteLine("Enter Command:");
+                string Command = Console.ReadLine();
+                var messageData = new TelemetryData
+                {
+                    Username = "Admin",
+                    Status = "Active",
+                    TimeStamp = DateTime.Now,
+                    Command = Command
 
-            
+                };
+                var jsonPayload = JsonSerializer.Serialize(messageData);
+                var message = new MqttApplicationMessageBuilder()
+                    .WithTopic("topic/Smartmeter/Commands")
+                    .WithPayload(jsonPayload)
+                    .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
+                    .Build();
 
-            await _mqttClient.EnqueueAsync(message);
-            Console.WriteLine($"Publishec JSON Message : {jsonPayload}"); 
+
+
+                await _mqttClient.EnqueueAsync(message);
+                Console.WriteLine($"Publishec JSON Message : {jsonPayload}");
+            }
             await Task.Delay(Timeout.Infinite); 
 
          
