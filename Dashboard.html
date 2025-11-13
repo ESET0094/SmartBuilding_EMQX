@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Meter MQTT Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #status { margin-bottom: 10px; padding: 5px; }
+    .connected { background-color: #e0ffe0; color: green; }
+    .disconnected { background-color: #ffe0e0; color: red; }
+    section { margin-bottom: 30px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    input[type="text"] { width: 70%; padding: 6px; }
+    button { padding: 6px 12px; }
+  </style>
+</head>
+<body>
+  <h2>🏢 Smart Meter MQTT Dashboard</h2>
+  <div id="status" class="disconnected">Status: Disconnected</div>
+
+  <!-- 🆕 User Input Section -->
+  <section>
+    <h3>💬 Send User Command (topic/Smartmeter/UserInput)</h3>
+    <input type="text" id="userInput" placeholder="Enter command or message...">
+    <button id="sendBtn">Send</button>
+    <p id="sendStatus" style="margin-top:5px; color:gray;"></p>
+
+    <!-- User Input Table -->
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Status</th>
+          <th>Command</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody id="userInputBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Commands Table -->
+  <section>
+    <h3>🧾 Commands / Status (topic/Smartmeter/Commands)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Status</th>
+          <th>Command</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody id="commandBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Telemetry Table -->
+  <section>
+    <h3>📊 Telemetry Data (topic/Smartmeter/Data)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>DeviceID</th>
+          <th>Voltage</th>
+          <th>Current</th>
+          <th>Power</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody id="telemetryBody"></tbody>
+    </table>
+  </section>
+
+  <script>
+    // MQTT Configuration
+    const BROKER_HOST = 'localhost'; // or 'haproxy' if inside Docker
+    const WS_PORT = 8083;
+    const WS_PATH = '/mqtt';
+    const USERNAME = 'Admin';
+    const PASSWORD = 'Public';
+
+    const clientId = 'mqttjs_' + Math.random().toString(16).substring(2, 10);
+    const host = `ws://${BROKER_HOST}:${WS_PORT}${WS_PATH}`;
+
+    const options = {
+      keepalive: 60,
+      clientId,
+      username: USERNAME,
+      password: PASSWORD,
+      protocolId: 'MQTT',
+      protocolVersion: 5,
+      clean: true,
+      reconnectPeriod: 1000,
+      connectTimeout: 30 * 1000,
+    };
+
+    const COMMAND_TOPIC = 'topic/Smartmeter/Commands';
+    const TELEMETRY_TOPIC = 'topic/Smartmeter/Data';
+    const USER_INPUT_TOPIC = 'topic/Smartmeter/UserInput';
+
+    const statusDiv = document.getElementById('status');
+    const commandBody = document.getElementById('commandBody');
+    const telemetryBody = document.getElementById('telemetryBody');
+    const userInputBody = document.getElementById('userInputBody');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const sendStatus = document.getElementById('sendStatus');
+
+    console.log(`Connecting to broker: ${host}`);
+    const client = mqtt.connect(host, options);
+
+    // Connection Events
+    client.on('connect', () => {
+      console.log('✅ Connected to EMQX broker');
+      statusDiv.textContent = 'Status: Connected';
+      statusDiv.className = 'connected';
+
+      client.subscribe([COMMAND_TOPIC, TELEMETRY_TOPIC, USER_INPUT_TOPIC], (err, granted) => {
+        if (err) {
+          console.error('❌ Subscription error:', err);
+        } else {
+          console.log('📡 Subscribed to:', granted.map(g => g.topic).join(', '));
+        }
+      });
+    });
+
+    client.on('message', (topic, message) => {
+      const payload = message.toString();
+      console.log(`📩 ${topic}: ${payload}`);
+
+      try {
+        const data = JSON.parse(payload);
+        if (topic === COMMAND_TOPIC) addCommandRow(data);
+        else if (topic === TELEMETRY_TOPIC) addTelemetryRow(data);
+        else if (topic === USER_INPUT_TOPIC) addUserInputRow(data);
+      } catch (e) {
+        console.warn('⚠️ Invalid JSON:', payload);
+      }
+    });
+
+    client.on('error', (err) => {
+      console.error('Connection error:', err);
+      statusDiv.textContent = `Status: Error - ${err.message}`;
+      statusDiv.className = 'disconnected';
+    });
+
+    client.on('reconnect', () => {
+      statusDiv.textContent = 'Status: Reconnecting...';
+      statusDiv.className = 'disconnected';
+    });
+
+    client.on('close', () => {
+      statusDiv.textContent = 'Status: Disconnected';
+      statusDiv.className = 'disconnected';
+    });
+
+    // 🆕 Publish user input
+    sendBtn.addEventListener('click', () => {
+      const text = userInput.value.trim();
+      if (!text) {
+        sendStatus.textContent = '⚠️ Please enter a command.';
+        sendStatus.style.color = 'orange';
+        return;
+      }
+
+      const payload = JSON.stringify({
+        Username: USERNAME,
+        Status: 'Sent',
+        Command: text,
+        TimeStamp: new Date().toISOString()
+      });
+
+      client.publish(USER_INPUT_TOPIC, payload, { qos: 0 }, (err) => {
+        if (err) {
+          sendStatus.textContent = '❌ Failed to send.';
+          sendStatus.style.color = 'red';
+          console.error('Publish error:', err);
+        } else {
+          sendStatus.textContent = '✅ Command sent!';
+          sendStatus.style.color = 'green';
+          console.log(`📤 Published to ${USER_INPUT_TOPIC}: ${payload}`);
+          addUserInputRow(JSON.parse(payload)); // Add locally too
+          userInput.value = '';
+        }
+      });
+    });
+
+    // Table update functions
+    function addUserInputRow(data) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${data.Username || '-'}</td>
+        <td>${data.Status || '-'}</td>
+        <td>${data.Command || '-'}</td>
+        <td>${data.TimeStamp || new Date().toISOString()}</td>`;
+      userInputBody.prepend(row);
+
+      if (userInputBody.children.length > 20) userInputBody.removeChild(userInputBody.lastChild);
+    }
+
+    function addCommandRow(data) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${data.Username || '-'}</td>
+        <td>${data.Status || '-'}</td>
+        <td>${data.Command || '-'}</td>
+        <td>${data.TimeStamp || new Date().toISOString()}</td>`;
+      commandBody.prepend(row);
+
+      if (commandBody.children.length > 20) commandBody.removeChild(commandBody.lastChild);
+    }
+
+    function addTelemetryRow(data) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${data.DeviceID || '-'}</td>
+        <td>${data.Voltage || '-'}</td>
+        <td>${data.Current || '-'}</td>
+        <td>${data.Power || '-'}</td>
+        <td>${data.Timestamp || new Date().toISOString()}</td>`;
+      telemetryBody.prepend(row);
+
+      if (telemetryBody.children.length > 20) telemetryBody.removeChild(telemetryBody.lastChild);
+    }
+  </script>
+</body>
+</html>
