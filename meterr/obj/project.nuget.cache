@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "55YkgNOKwnA=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\HP\\source\\repos\\meterr\\meterr.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\HP\\.nuget\\packages\\mqttnet\\4.3.7.1207\\mqttnet.4.3.7.1207.nupkg.sha512",
+    "C:\\Users\\HP\\.nuget\\packages\\mqttnet.extensions.managedclient\\4.3.7.1207\\mqttnet.extensions.managedclient.4.3.7.1207.nupkg.sha512"
+  ],
+  "logs": []
+}
